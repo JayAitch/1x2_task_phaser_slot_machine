@@ -1,4 +1,4 @@
-# Task #
+Task
 
 Given a set of symbol assets and dummy responses create your own very simple slot machine.
 
