@@ -5,6 +5,7 @@ gameConfig = {
         current: 5
     },
     "stake-change-magnitude": 5,
+    balance: 10000,
 }
 
 
@@ -52,6 +53,9 @@ class MainScene extends Phaser.Scene {
         // create stake controls pass stake object via reference
         let stakeControls = new StakeControls(this, this.stakes);
 
+        // create balance display
+        let balanceDisplay = new BalanceDisplay(this);
+
         // stubbed create spin button (display only currently)
         let playButton =  new Button(this,
             game.config.width - 100,
@@ -65,7 +69,23 @@ class MainScene extends Phaser.Scene {
 
     }
 }
+class BalanceDisplay{
+    constructor(scene) {
+        let displayY = game.config.height - 100;
+        // create current balance display
+        this.balanceText = scene.add.text(
+            100,
+            displayY,
+            gameConfig.balance,
+        );
+        this.balanceText.setOrigin(0.5);
+    }
 
+    showBalance(){
+        // display remaining balance
+        this.balanceText.setText(gameConfig.balance);
+    }
+}
 
 class StakeControls{
     constructor(scene, stakes) {
