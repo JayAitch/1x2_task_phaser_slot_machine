@@ -6,6 +6,7 @@ const gameConfig = {
     },
     "stake-change-magnitude": 5,
     balance: 10000,
+    "wheel-amount": 4
 }
 
 
@@ -30,27 +31,11 @@ class MainScene extends Phaser.Scene {
     }
 
     create() {
-
-        // render all symbols, play animations test to display symbols
-        let cherry = this.add.spine(400, 400, 'cherry');
-        let lemon = this.add.spine(500, 400, 'lemon');
-        let orange = this.add.spine(600, 400, 'orange');
-        let plumb = this.add.spine(700, 400, 'plumb');
-        let grapes = this.add.spine(800, 400, 'grapes');
-        let melon = this.add.spine(900, 400, 'melon');
-
-        // reference the symbols in map
-        this.slotWheelMap = {
-            0: cherry,
-            1: lemon,
-            2: orange,
-            3: plumb,
-            4: grapes,
-            5: melon
-        }
+        // display all the wheels
+        this.wheelArray = new SpinningWheelArray(this);
 
         // create stake controls pass stake object via reference
-        let stakeControls = new StakeControls(this, this.stakes);
+        this.stakeControls = new StakeControls(this, this.stakes);
 
         // create balance display
         this.balanceDisplay = new BalanceDisplay(this);
@@ -67,19 +52,29 @@ class MainScene extends Phaser.Scene {
 
 
     performSpinAction(){
+        // disable the spin button
         this.spinButton.setInteractive(false);
-
+        this.stakeControls.setInteractive(false);
+        // trigger promise to check for win and trigger spins
         let spinPromise = new Promise(
             (resolution, rejection)=>{
                 this.simulateSpin(resolution, rejection);
             }
-        ).catch(
-            error =>{
-                this.spinErrorDisplay(error);
-            })
+        ).catch(error =>{
+            // display error message to the user
+            this.spinErrorDisplay(error);
+        })
 
+        // after result is worked out
         spinPromise.then(()=>{
+            // only show where the balance has changed
+            if(this.lastWinAmount){
+                this.rewardPlay(this.lastWinAmount);
+            }
+
+            // everything is done, re-enable the buttons
             this.spinButton.setInteractive(true);
+            this.stakeControls.setInteractive(true);
         })
     }
 
@@ -114,13 +109,9 @@ class MainScene extends Phaser.Scene {
                     let result = response.results;
 
                     // is there a win property thats above 0
-                    if(result.win && result.win > 0){
+                    this.lastWinAmount = result.win;
+                    this.showWheelSpin(result.symbolIDs, resolution);
 
-                        // perform win procedure
-                        this.rewardPlay(result);
-                    }
-                    // resolve the promise
-                    resolution("done");
                 }
                 else{
                     // malformed response
@@ -145,24 +136,17 @@ class MainScene extends Phaser.Scene {
         this.balanceDisplay.showBalance();
     }
 
-    rewardPlay(result){
+    rewardPlay(amount){
         // add the win amount to the current balance
-        gameConfig.balance += result.win;
+        gameConfig.balance += amount;
         // display any changes
         this.balanceDisplay.showBalance();
-        // animate the winning symbols
-        this.showWinAnimations(result.symbolIDs);
-        this.balanceMessageDisplay(result.win);
+        this.balanceMessageDisplay(amount);
     }
 
-    showWinAnimations(ids){
-        // go through the winning ids
-        ids.forEach((id)=>{
-            // find in the map
-            let symbol = this.slotWheelMap[id];
-            // play the win animation
-            symbol.play("win");
-        })
+    showWheelSpin(ids, resolution){
+        // animate the wheel, a blank list of ids will produce fake spins
+        this.wheelArray.animateSpin(ids, resolution);
     }
 
 
@@ -175,10 +159,171 @@ class MainScene extends Phaser.Scene {
         }
     }
 
-    update(){
+}
+
+
+
+
+
+
+class SpinningWheelArray{
+
+    constructor(scene) {
+        this.wheels = [];
+        let startPos = 400;
+        let wheelOffset = 150;
+
+        // create a wheel to display each potential wins
+        for(let i = 0; gameConfig["wheel-amount"] > i; i++ ){
+            let xPosition = startPos + (wheelOffset * i + 1);
+            this.wheels.push(new SpinningWheel(scene, xPosition));
+        }
+
+        let graphics = scene.add.graphics({ fillStyle: { color: 0x000000 } });
+
+        // bottom of the wheel cover
+        let bottomCover = new Phaser.Geom.Rectangle(
+            0,
+            500,
+            game.config.width,
+            600
+        );
+
+        // top of the wheel cover
+        let topCover = new Phaser.Geom.Rectangle(
+            0,
+            0,
+            game.config.width,
+            300
+        );
+
+        // cover up the addition spines to give the effect of a wheel
+        graphics.fillRectShape(bottomCover);
+        graphics.fillRectShape(topCover);
+    }
+
+    animateSpin(results, resolution){
+
+        // trigger tweens to animate the 'wheel'
+        let i;
+        // show all of the winning results
+        for(i = 0; i < results.length; i++){
+            let wheel  = this.wheels[i];
+            wheel.spin(results[i], true, resolution);
+        }
+
+        // run fake spins to simulate loosing wheels
+        for(let j = i; j < this.wheels.length; j++){
+            let wheel  = this.wheels[j];
+            wheel.spin(randomNumberBetween(0, 5),false, resolution);
+        }
 
     }
 }
+
+
+
+
+
+class SpinningWheel{
+    constructor(scene, x) {
+
+        // display one of each of the symbols
+        let cherry = scene.add.spine(x, -320, 'cherry');
+        let lemon  = scene.add.spine(x, -180, 'lemon');
+        let orange = scene.add.spine(x, -40, 'orange');
+        let plumb  = scene.add.spine(x, 100, 'plumb');
+        let grapes = scene.add.spine(x, 240, 'grapes');
+        let melon  = scene.add.spine(x, 380, 'melon');
+
+        // set base values to allow the rolling to continue
+        cherry.baseY = -320;
+        lemon.baseY  = -180;
+        orange.baseY = -40;
+        plumb.baseY  = 100;
+        grapes.baseY = 240;
+        melon.baseY  = 380;
+
+        // adding timeline at runtime
+        this.scene = scene;
+
+        // array of wheel pictures
+        this.wheelSpines = [cherry, lemon, orange, plumb, grapes, melon];
+
+    }
+    spin(result, isWin, resolution){
+        let timeline = this.scene.tweens.createTimeline();
+
+        // tween spine to original position
+        timeline.add({
+            targets: this.wheelSpines,
+            y: {
+                value: {
+                    getEnd: function (target)
+                    {
+                        // the end is its original position
+                        return target.baseY;
+                    }
+                }},
+            ease: 'Linear',
+            duration: 600,
+            repeat: 0
+        });
+
+        // repeated spin, show the wheel rolling round
+        timeline.add({
+            targets: this.wheelSpines,
+            y: {value: '+=700'},
+            ease: 'Linear',
+            duration: 600,
+            repeat: 3
+        });
+
+        // show the result of the spin
+        timeline.add({
+            targets: this.wheelSpines,
+
+            y: {
+                value: {
+                    getEnd: function (target, key, value, targetIndex)
+                    {
+                        // how far away from the winning index is the current spine
+                        let goalDiff = targetIndex - result;
+                        // work out what position that reprisents
+                        let finishPos = ( 140 ) * goalDiff + 400;
+                        // finish at that location
+                        return finishPos
+                    }
+                }
+            },
+            onComplete: () =>{
+                // tigger after finishing
+                if(isWin)
+                    // only animate the wining symbols
+                    this.playAnimation(result);
+                // trigger promise resolution enabling the spin again
+                resolution("done");
+            },
+            ease: 'Bounce',
+            duration: 200,
+            repeat: 0
+        });
+        // chain the tween above
+        timeline.play();
+    }
+
+    playAnimation(pos){
+        // animation the winning symbol
+        this.wheelSpines[pos].play("win");
+    }
+}
+
+
+
+
+
+
+
 
 class BalanceDisplay{
     constructor(scene) {
@@ -197,6 +342,11 @@ class BalanceDisplay{
         this.balanceText.setText(gameConfig.balance);
     }
 }
+
+
+
+
+
 
 
 class FadingText{
@@ -225,7 +375,7 @@ class StakeControls{
         let controlY = game.config.height - 50;
 
         // create increase stakes button
-        let plusButton =  new Button(scene,
+        this.plusButton =  new Button(scene,
             50,
             controlY,
             50,
@@ -234,7 +384,7 @@ class StakeControls{
             "+");
 
         // create decrease stakes button
-        let minusButton =  new Button(scene,
+        this.minusButton =  new Button(scene,
             150,controlY,
             50,
             50,
@@ -272,6 +422,13 @@ class StakeControls{
         // change the display to reprisent the new stakes
         this.currentStakeText.setText(this.stakes.current);
     }
+
+    setInteractive(val){
+
+        // disable interactability
+        this.plusButton.setInteractive(val);
+        this.minusButton.setInteractive(val);
+    }
 }
 
 
@@ -285,7 +442,7 @@ class Button{
             height
         );
         // add the graphics to the scene
-        let graphics = scene.add.graphics({ fillStyle: { color: 0xffffff,alpha:0.3 } });
+        this.graphics = scene.add.graphics({ fillStyle: { color: 0xffffff,alpha:0.3 } });
 
         // Zone to handle touch/click input
         this.clickZone = scene.add.zone(
@@ -305,14 +462,16 @@ class Button{
         })
 
         // display the visible touch area
-        graphics.fillRectShape(rect);
+        this.graphics.fillRectShape(rect);
     }
 
     setInteractive(val){
         // change interactability
         if(val){
+            this.graphics.alpha = 0.3;
             this.clickZone.setInteractive();
         }else{
+            this.graphics.alpha = 0.1;
             this.clickZone.disableInteractive();
         }
     }
