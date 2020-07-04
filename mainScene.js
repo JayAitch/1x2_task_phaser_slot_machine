@@ -1,4 +1,4 @@
-gameConfig = {
+const gameConfig = {
     stakes:{
         max: 50,
         min: 5,
@@ -84,7 +84,14 @@ class MainScene extends Phaser.Scene {
     }
 
     spinErrorDisplay(val){
-        console.log(val);
+        // feedback spin attempt error to UI
+        let errorText = new FadingText(this, val,game.config.width - 100,game.config.height - 100);
+    }
+
+    balanceMessageDisplay(val){
+        // show gaining or loosing money
+        let sign = val? "+": "";
+        let balanceMessage = new FadingText(this, sign + val,100,game.config.height - 140);
     }
 
     simulateSpin(resolution, rejection){
@@ -139,12 +146,13 @@ class MainScene extends Phaser.Scene {
     }
 
     rewardPlay(result){
-        // add the win amount to the current ballance
+        // add the win amount to the current balance
         gameConfig.balance += result.win;
         // display any changes
         this.balanceDisplay.showBalance();
         // animate the winning symbols
         this.showWinAnimations(result.symbolIDs);
+        this.balanceMessageDisplay(result.win);
     }
 
     showWinAnimations(ids){
@@ -190,6 +198,25 @@ class BalanceDisplay{
     }
 }
 
+
+class FadingText{
+    constructor(scene, text, x, y) {
+        // show the message and hide it gradually
+        let fadingText = scene.add.text(x,y,text);
+        fadingText.setOrigin(0.5);
+
+        scene.add.tween({
+            targets:fadingText,
+            alpha: {from:1, to:0},
+            ease: 'Linear',
+            duration: 1000,
+            delay:0
+        })
+
+    }
+}
+
+
 class StakeControls{
     constructor(scene, stakes) {
 
@@ -231,12 +258,12 @@ class StakeControls{
         // do the change to stakes
         this.stakes.current += change;
 
-        // is the current value to low?
+        // is the current value too low?
         if(this.stakes.current < this.stakes.min){
             // set it to the minimum
             this.stakes.current = this.stakes.min;
         }
-        // is the current value to high?
+        // is the current value too high?
         else if(this.stakes.current > this.stakes.max){
             // set it to the maximum
             this.stakes.current = this.stakes.max;
