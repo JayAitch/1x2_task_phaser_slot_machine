@@ -205,3 +205,14 @@ window.addEventListener('load', function() {
     game = new Phaser.Game(config)
 })
 
+function getRandomRoll(){
+    // simulate a role, normaly performed server side
+   let randomNumber = randomNumberBetween(0, data.length - 1);
+   let result = data[randomNumber];
+
+   return result;
+}
+
+function randomNumberBetween(min, max){
+    return Math.floor(Math.random() * (max - min + 1) + min);
+}

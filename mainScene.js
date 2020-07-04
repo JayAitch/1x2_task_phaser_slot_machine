@@ -32,43 +32,146 @@ class MainScene extends Phaser.Scene {
     create() {
 
         // render all symbols, play animations test to display symbols
-        let cherry = this.add.spine(100, 400, 'cherry');
-        cherry.play("win", true);
+        let cherry = this.add.spine(400, 400, 'cherry');
+        let lemon = this.add.spine(500, 400, 'lemon');
+        let orange = this.add.spine(600, 400, 'orange');
+        let plumb = this.add.spine(700, 400, 'plumb');
+        let grapes = this.add.spine(800, 400, 'grapes');
+        let melon = this.add.spine(900, 400, 'melon');
 
-        let lemon = this.add.spine(200, 400, 'lemon');
-        lemon.play("win", true);
-
-        let orange = this.add.spine(300, 400, 'orange');
-        orange.play("win", true);
-
-        let plumb = this.add.spine(400, 400, 'plumb');
-        plumb.play("win", true);
-
-        let grapes = this.add.spine(500, 400, 'grapes');
-        grapes.play("win", true);
-
-        let melon = this.add.spine(600, 400, 'melon');
-        melon.play("win", true);
+        // reference the symbols in map
+        this.slotWheelMap = {
+            0: cherry,
+            1: lemon,
+            2: orange,
+            3: plumb,
+            4: grapes,
+            5: melon
+        }
 
         // create stake controls pass stake object via reference
         let stakeControls = new StakeControls(this, this.stakes);
 
         // create balance display
-        let balanceDisplay = new BalanceDisplay(this);
+        this.balanceDisplay = new BalanceDisplay(this);
 
-        // stubbed create spin button (display only currently)
-        let playButton =  new Button(this,
+        // create the spin button, handle action via the scene
+        this.spinButton =  new Button(this,
             game.config.width - 100,
             game.config.height - 50,
             150,
             50,
-            function(){console.log("SPIN BUTTON")},
+            ()=> {this.performSpinAction()},
             "SPIN!");
     }
+
+
+    performSpinAction(){
+        this.spinButton.setInteractive(false);
+
+        let spinPromise = new Promise(
+            (resolution, rejection)=>{
+                this.simulateSpin(resolution, rejection);
+            }
+        ).catch(
+            error =>{
+                this.spinErrorDisplay(error);
+            })
+
+        spinPromise.then(()=>{
+            this.spinButton.setInteractive(true);
+        })
+    }
+
+    spinErrorDisplay(val){
+        console.log(val);
+    }
+
+    simulateSpin(resolution, rejection){
+
+        // make sure the bet is affordable
+        if(this.canAffordBet()){
+
+            // simulate reduction in balance
+            this.removeBalance();
+
+            // simulate API call for result
+            let rollResult = getRandomRoll();
+
+            // safely access the response of the roll
+            if(rollResult.hasOwnProperty("response")){
+                let response = rollResult.response;
+
+                // safely access the result of the response
+                if(response.hasOwnProperty("results")) {
+                    let result = response.results;
+
+                    // is there a win property thats above 0
+                    if(result.win && result.win > 0){
+
+                        // perform win procedure
+                        this.rewardPlay(result);
+                    }
+                    // resolve the promise
+                    resolution("done");
+                }
+                else{
+                    // malformed response
+                    rejection("bad response");
+                }
+            }
+            else{
+                // malformed response
+                rejection("bad response");
+            }
+        }
+        else{
+            // not enough money to bet
+            rejection("not enough funds");
+        }
+    }
+
+    removeBalance(){
+        // deduct the balance
+        gameConfig.balance -= this.stakes.current;
+        // display deduction
+        this.balanceDisplay.showBalance();
+    }
+
+    rewardPlay(result){
+        // add the win amount to the current ballance
+        gameConfig.balance += result.win;
+        // display any changes
+        this.balanceDisplay.showBalance();
+        // animate the winning symbols
+        this.showWinAnimations(result.symbolIDs);
+    }
+
+    showWinAnimations(ids){
+        // go through the winning ids
+        ids.forEach((id)=>{
+            // find in the map
+            let symbol = this.slotWheelMap[id];
+            // play the win animation
+            symbol.play("win");
+        })
+    }
+
+
+
+    canAffordBet(){
+        if(gameConfig.balance >= this.stakes.current){
+            return true;
+        }else{
+            return false;
+        }
+    }
+
     update(){
 
     }
 }
+
 class BalanceDisplay{
     constructor(scene) {
         let displayY = game.config.height - 100;
