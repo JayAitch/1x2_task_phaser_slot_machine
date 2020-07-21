@@ -196,6 +196,10 @@ let config  = {
             }
         ]
     },
+    dom: {
+        createContainer: true
+    },
+    parent: 'divId',
     scene:[MainScene]
 }
 

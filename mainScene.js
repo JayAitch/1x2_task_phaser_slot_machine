@@ -50,7 +50,9 @@ class MainScene extends Phaser.Scene {
             () => {
                 this.performSpinAction()
             },
-            "SPIN!");
+            "SPIN!",
+            "Press to play"
+        );
     }
 
 
@@ -302,7 +304,9 @@ class SpinningWheel {
 
         // array of wheel pictures
         this.wheelSpines = [cherry, lemon, orange, plumb, grapes, melon];
-
+        let elem = scene.add.dom(x, 240, 'div', 'width: 200px;height:200px;color:red');
+        elem.node.setAttribute('aria-label', 'real');
+        elem.node.setAttribute('tabindex', '1');
     }
     spin(result, isWin, resolution) {
         let timeline = this.scene.tweens.createTimeline();
@@ -433,7 +437,9 @@ class StakeControls {
             () => {
                 this.changeStakes(+1)
             },
-            "+");
+            "+",
+            "increase stake"
+        );
 
         // create decrease stakes button
         this.minusButton = new Button(scene,
@@ -443,7 +449,8 @@ class StakeControls {
             () => {
                 this.changeStakes(-1)
             },
-            "-")
+            "-",
+            "decrease stake")
 
         // create current stakes display
         this.currentStakeText = scene.add.text(
@@ -487,7 +494,7 @@ class StakeControls {
 
 
 class Button {
-    constructor(scene, x, y, width, height, action, text) {
+    constructor(scene, x, y, width, height, action, text, ariaText) {
         // shape to reprisent the touch area
         let rect = new Phaser.Geom.Rectangle(
             x - width / 2,
@@ -522,6 +529,11 @@ class Button {
 
         // display the visible touch area
         this.graphics.fillRectShape(rect);
+
+        // supper impose a dom element over  the top of the button
+        let elem = scene.add.dom(x, y, 'div', `width: ${width}px;height:${height}px;`);
+        elem.node.setAttribute('aria-label', ariaText);
+        elem.node.setAttribute('tabindex', '1');
     }
 
     setInteractive(val) {
